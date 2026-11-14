@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- 主背景深邃科技渐变 -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="50%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#0B1120"/>
+    </linearGradient>
+
+    <!-- 外框高光渐变 -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.85"/>
+      <stop offset="50%" stop-color="#6366F1" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0.75"/>
+    </linearGradient>
+
+    <!-- 中心芯片主体渐变 -->
+    <linearGradient id="chipGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+
+    <!-- 波形青绿霓虹渐变 -->
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="55%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+
+    <!-- 金属引脚渐变 -->
+    <linearGradient id="pinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#94A3B8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+
+    <!-- 蓝牙/无线电弧渐变 -->
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角矩形底座 (Squircle) -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="6"/>
+
+  <!-- 内部装饰暗网格线 -->
+  <g stroke="#334155" stroke-width="1.5" stroke-opacity="0.35">
+    <line x1="76" y1="166" x2="436" y2="166"/>
+    <line x1="76" y1="256" x2="436" y2="256"/>
+    <line x1="76" y1="346" x2="436" y2="346"/>
+    <line x1="166" y1="76" x2="166" y2="436"/>
+    <line x1="256" y1="76" x2="256" y2="436"/>
+    <line x1="346" y1="76" x2="346" y2="436"/>
+  </g>
+
+  <!-- 芯片四周通信引脚 (Top / Bottom / Left / Right) -->
+  <g fill="url(#pinGrad)">
+    <!-- Top pins -->
+    <rect x="158" y="64" width="22" height="42" rx="6"/>
+    <rect x="214" y="64" width="22" height="42" rx="6"/>
+    <rect x="276" y="64" width="22" height="42" rx="6"/>
+    <rect x="332" y="64" width="22" height="42" rx="6"/>
+    <!-- Bottom pins -->
+    <rect x="158" y="406" width="22" height="42" rx="6"/>
+    <rect x="214" y="406" width="22" height="42" rx="6"/>
+    <rect x="276" y="406" width="22" height="42" rx="6"/>
+    <rect x="332" y="406" width="22" height="42" rx="6"/>
+    <!-- Left pins -->
+    <rect x="64" y="158" width="42" height="22" rx="6"/>
+    <rect x="64" y="214" width="42" height="22" rx="6"/>
+    <rect x="64" y="276" width="42" height="22" rx="6"/>
+    <rect x="64" y="332" width="42" height="22" rx="6"/>
+    <!-- Right pins -->
+    <rect x="406" y="158" width="42" height="22" rx="6"/>
+    <rect x="406" y="214" width="42" height="22" rx="6"/>
+    <rect x="406" y="276" width="42" height="22" rx="6"/>
+    <rect x="406" y="332" width="42" height="22" rx="6"/>
+  </g>
+
+  <!-- 核心芯片/示波器视窗外框 -->
+  <rect x="98" y="98" width="316" height="316" rx="44" fill="url(#chipGrad)" stroke="#475569" stroke-width="5"/>
+  <rect x="116" y="116" width="280" height="280" rx="30" fill="#090F1D" stroke="#1E293B" stroke-width="3"/>
+
+  <!-- 左上角 RX / TX 状态指示灯 -->
+  <circle cx="148" cy="148" r="8" fill="#38BDF8"/>
+  <circle cx="174" cy="148" r="8" fill="#34D399"/>
+  <circle cx="200" cy="148" r="8" fill="#FBBF24"/>
+
+  <!-- 右上角无线蓝牙/网络信号波纹 -->
+  <path d="M 332 162 A 22 22 0 0 1 354 184" fill="none" stroke="url(#amberGrad)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M 332 144 A 40 40 0 0 1 372 184" fill="none" stroke="url(#amberGrad)" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- 下方数字逻辑方波 (UART TTL 帧脉冲) -->
+  <path d="M 136 344 L 172 344 L 172 312 L 210 312 L 210 344 L 236 344 L 236 312 L 292 312 L 292 344 L 330 344 L 330 312 L 376 312"
+        fill="none" stroke="#6366F1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+
+  <!-- 中央发光模拟+数字示波器主波形 -->
+  <path d="M 132 256 L 168 256 L 190 198 L 222 302 L 256 172 L 290 292 L 316 222 L 340 256 L 380 256"
+        fill="none" stroke="#0EA5E9" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.22"/>
+  <path d="M 132 256 L 168 256 L 190 198 L 222 302 L 256 172 L 290 292 L 316 222 L 340 256 L 380 256"
+        fill="none" stroke="url(#waveGrad)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- 波形采样高亮节点 -->
+  <circle cx="132" cy="256" r="7" fill="#38BDF8"/>
+  <circle cx="256" cy="172" r="8" fill="#22D3EE" stroke="#FFFFFF" stroke-width="2.5"/>
+  <circle cx="380" cy="256" r="7" fill="#34D399"/>
+</svg>

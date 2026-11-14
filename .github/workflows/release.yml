@@ -1,0 +1,66 @@
+name: Release Windows Nuitka Build
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python and dependencies
+        env:
+          UV_DEFAULT_INDEX: https://pypi.org/simple
+        run: |
+          uv python install
+          uv sync --dev
+
+      - name: Build single-file executable with Nuitka
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -match '^v(.+)$') {
+            $name = "OmniPortStudio-$tag-win-x64.exe"
+          } else {
+            $name = "OmniPortStudio-win-x64.exe"
+          }
+          uv run python build_nuitka.py --output-name "$name"
+
+      - name: Verify release asset size (< 50 MB)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem dist/*.exe | Select-Object -First 1
+          if (-not $exe) { throw "No executable produced in dist/" }
+          $mb = [math]::Round($exe.Length / 1MB, 2)
+          Write-Host "Artifact: $($exe.Name) ($mb MB / $($exe.Length) bytes)"
+          if ($exe.Length -gt 50MB) {
+            throw "Release executable exceeds 50 MB limit: $mb MB"
+          }
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exe = Get-ChildItem dist/*.exe | Select-Object -First 1
+          $mb = [math]::Round($exe.Length / 1MB, 2)
+          gh release create "$tag" $exe.FullName `
+            --title "OmniPort Studio $tag" `
+            --notes "Windows x64 单文件发行版（使用 Nuitka 构建，体积 ${mb} MB，已内嵌 Flet Desktop 运行时）。"

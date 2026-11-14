@@ -1,0 +1,21 @@
+[project]
+name = "bluetooth"
+version = "0.2.0"
+description = "OmniPort Studio - 多功能串口 / BLE蓝牙 / TCP-UDP 网络综合调试助手 (Flet 1.x)"
+readme = "README.md"
+requires-python = ">=3.11.13"
+dependencies = [
+    "bleak>=2.1.1",
+    "flet[all]>=1.1.2",
+    "pyserial>=3.5",
+]
+
+[dependency-groups]
+dev = [
+    "nuitka>=2.8.9",
+    "zstandard>=0.25.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
