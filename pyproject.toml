@@ -1,6 +1,6 @@
 [project]
 name = "bluetooth"
-version = "0.2.0"
+version = "0.3.0"
 description = "OmniPort Studio - 多功能串口 / BLE蓝牙 / TCP-UDP 网络综合调试助手 (Flet 1.x)"
 readme = "README.md"
 requires-python = ">=3.11.13"

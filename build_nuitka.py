@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import ctypes
 from ctypes import wintypes
 import hashlib
@@ -22,6 +23,7 @@ ASSETS_DIR = ROOT_DIR / "assets"
 ICON_ICO = ASSETS_DIR / "icon.ico"
 
 MAX_RELEASE_BYTES = 50 * 1024 * 1024  # 50 MB hard ceiling
+MIN_CLIENT_DEFAULT_DIR = BUILD_DIR / "min_flet_client" / "flet"
 
 EXCLUDED_MODULES = (
     "flet_web",
@@ -29,6 +31,23 @@ EXCLUDED_MODULES = (
     "flet.testing",
     "flet.pytest_plugin",
     "flet_js",
+    "flet.auth",
+    "flet.fastapi",
+    "flet.security",
+    "ssl",
+    "_ssl",
+    "_hashlib",
+    "bleak.backends.bluezdbus",
+    "bleak.backends.corebluetooth",
+    "bleak.backends.p4android",
+    "dbus_fast",
+    "objc",
+    "Foundation",
+    "CoreBluetooth",
+    "CoreFoundation",
+    "libdispatch",
+    "jnius",
+    "android",
     "fastapi",
     "uvicorn",
     "starlette",
@@ -62,6 +81,46 @@ EXCLUDED_MODULES = (
     "griffe",
     "setuptools",
 )
+
+
+def collect_flet_runtime_includes() -> tuple[list[str], list[str]]:
+    """Resolve exact lazy Flet control modules referenced by project sources."""
+    import flet
+
+    used_ft: set[str] = set()
+    py_files = [ROOT_DIR / "main.py", *(ROOT_DIR / "serial_assistant").glob("*.py")]
+    for py_file in py_files:
+        tree = ast.parse(py_file.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "ft"
+            ):
+                used_ft.add(node.attr)
+
+    lazy_map = getattr(flet, "_LAZY", {})
+    modules: set[str] = {
+        "flet.app",
+        "flet.canvas",
+        "flet.controls.core.canvas",
+        "flet.data_channel",
+    }
+    for attr in used_ft:
+        target = lazy_map.get(attr)
+        if isinstance(target, tuple):
+            modules.add(str(target[0]))
+        elif isinstance(target, str):
+            modules.add(target)
+
+    # cupertino_colors is imported by flet.controls.types; exclude unused cupertino controls.
+    cupertino_dir = Path(flet.__file__).resolve().parent / "controls" / "cupertino"
+    unused_cupertino = [
+        f"flet.controls.cupertino.{p.stem}"
+        for p in sorted(cupertino_dir.glob("*.py"))
+        if p.stem not in ("__init__", "cupertino_colors")
+    ]
+    return sorted(modules), unused_cupertino
 
 
 def read_project_version() -> str:
@@ -150,14 +209,61 @@ def patch_exe_icon(exe_path: Path, ico_path: Path, group_id: int = 101) -> None:
             raise ctypes.WinError(ctypes.get_last_error())
 
 
-def stage_flet_desktop_archive(stage_dir: Path) -> Path:
-    """Create a deterministic LZMA-compressed flet-windows.zip + sha256 sidecar."""
+def resolve_flet_client_dir(
+    flet_client_dir: Path | None = None,
+    allow_full_client: bool = False,
+) -> Path:
+    """Locate or build the minimal stripped Flet desktop client directory."""
+    candidates: list[Path] = []
+    if flet_client_dir is not None:
+        candidates.append(flet_client_dir)
+    env_dir = os.environ.get("OMNIPORT_FLET_CLIENT_DIR")
+    if env_dir:
+        candidates.append(Path(env_dir))
+    candidates.append(MIN_CLIENT_DEFAULT_DIR)
+
+    for candidate in candidates:
+        if (candidate / "flet.exe").is_file() and (candidate / "data" / "app.so").is_file():
+            print(f"Using minimal Flet client: {candidate}")
+            return candidate
+
+    if not allow_full_client:
+        min_builder = ROOT_DIR / "scripts" / "build_min_flet_client.py"
+        if min_builder.is_file():
+            try:
+                subprocess.run(
+                    [sys.executable, str(min_builder), "--output-dir", str(MIN_CLIENT_DEFAULT_DIR)],
+                    cwd=str(ROOT_DIR),
+                    check=True,
+                )
+                if (MIN_CLIENT_DEFAULT_DIR / "flet.exe").is_file():
+                    return MIN_CLIENT_DEFAULT_DIR
+            except Exception as exc:
+                raise RuntimeError(
+                    "Minimal Flet client not found and auto-build failed. "
+                    "Build it via scripts/build_min_flet_client.py or pass --allow-full-client."
+                ) from exc
+
     import flet_desktop
 
     cache_dir = Path(flet_desktop.ensure_client_cached())
     source_flet_dir = cache_dir / "flet"
     if not source_flet_dir.is_dir():
         raise FileNotFoundError(f"Flet desktop client not found at {source_flet_dir}")
+    print(f"Warning: falling back to full Flet client: {source_flet_dir}")
+    return source_flet_dir
+
+
+def stage_flet_desktop_archive(
+    stage_dir: Path,
+    flet_client_dir: Path | None = None,
+    allow_full_client: bool = False,
+) -> Path:
+    """Create a deterministic LZMA-compressed flet-windows.zip + sha256 sidecar."""
+    source_flet_dir = resolve_flet_client_dir(
+        flet_client_dir=flet_client_dir,
+        allow_full_client=allow_full_client,
+    )
 
     temp_flet_dir = BUILD_DIR / "flet_stage" / "flet"
     if temp_flet_dir.parent.exists():
@@ -201,11 +307,21 @@ def stage_flet_desktop_archive(stage_dir: Path) -> Path:
     return stage_dir
 
 
-def build(output_name: str = "OmniPortStudio.exe", debug_standalone: bool = False) -> Path:
+def build(
+    output_name: str = "OmniPortStudio.exe",
+    debug_standalone: bool = False,
+    flet_client_dir: Path | None = None,
+    allow_full_client: bool = False,
+) -> Path:
     version = read_project_version()
     four_part_version = to_four_part_version(version)
 
-    stage_dir = stage_flet_desktop_archive(BUILD_DIR / "flet_desktop_app")
+    stage_dir = stage_flet_desktop_archive(
+        BUILD_DIR / "flet_desktop_app",
+        flet_client_dir=flet_client_dir,
+        allow_full_client=allow_full_client,
+    )
+    include_modules, unused_cupertino = collect_flet_runtime_includes()
     target_dist = (BUILD_DIR / "debug_standalone") if debug_standalone else DIST_DIR
     target_dist.mkdir(parents=True, exist_ok=True)
 
@@ -214,6 +330,7 @@ def build(output_name: str = "OmniPortStudio.exe", debug_standalone: bool = Fals
         "-m",
         "nuitka",
         "--standalone",
+        "--python-flag=no_docstrings",
     ]
     if not debug_standalone:
         cmd.extend(
@@ -236,21 +353,19 @@ def build(output_name: str = "OmniPortStudio.exe", debug_standalone: bool = Fals
             "--assume-yes-for-downloads",
             f"--include-data-dir={ASSETS_DIR}=assets",
             f"--include-data-dir={stage_dir}=flet_desktop/app",
-            "--include-package-data=flet:*.json",
-            "--include-module=flet.app",
-            "--include-module=flet.data_channel",
-            "--include-package=flet.controls",
-            "--include-package=flet.components",
+            "--include-package-data=flet:controls/material/icons.json",
+            "--include-package-data=winrt:*.pywinrt",
             "--include-package=flet.messaging",
             "--include-package=flet.pubsub",
-            "--include-package=flet.security",
             "--include-package=flet.utils",
             "--include-package=flet_desktop",
             "--include-package=bleak.backends.winrt",
             "--include-package=winrt",
         ]
     )
-    for mod in EXCLUDED_MODULES:
+    for mod in include_modules:
+        cmd.append(f"--include-module={mod}")
+    for mod in (*EXCLUDED_MODULES, *unused_cupertino):
         cmd.append(f"--nofollow-import-to={mod}")
     cmd.append(str(ROOT_DIR / "main.py"))
 
@@ -284,8 +399,24 @@ def main() -> None:
         action="store_true",
         help="Build an uncompressed standalone folder with console enabled for smoke testing.",
     )
+    parser.add_argument(
+        "--flet-client-dir",
+        type=Path,
+        default=None,
+        help="Path to a prebuilt minimal Flet Windows client directory containing flet.exe.",
+    )
+    parser.add_argument(
+        "--allow-full-client",
+        action="store_true",
+        help="Allow falling back to the full cached flet-desktop client if minimal build is unavailable.",
+    )
     args = parser.parse_args()
-    build(output_name=args.output_name, debug_standalone=args.debug_standalone)
+    build(
+        output_name=args.output_name,
+        debug_standalone=args.debug_standalone,
+        flet_client_dir=args.flet_client_dir,
+        allow_full_client=args.allow_full_client,
+    )
 
 
 if __name__ == "__main__":

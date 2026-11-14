@@ -45,12 +45,20 @@ uv run flet run main.py
 uv add --upgrade "flet[all]"
 ```
 
-## 使用 Nuitka 打包单文件发行版 (< 50 MB)
+## 使用 Nuitka 打包极简单文件发行版 (< 20 MB)
+
+通过精简剔除 Flet 客户端中未使用的媒体播放器 / Rive / ANGLE 等原生扩展，并按 AST 静态分析裁剪 Nuitka Python 运行时，最终单文件 EXE 体积仅约 **19.5 MB**。
 
 ```powershell
 # 同步开发依赖（含 nuitka 与 zstandard）
 uv sync --dev
 
+# 构建极简无冗余扩展的 Flet Windows 客户端（需 Flutter 3.47.x；国内网络可加 --cn-mirrors）
+uv run python scripts/build_min_flet_client.py --cn-mirrors
+
 # 构建单文件 Windows 可执行程序到 dist/OmniPortStudio.exe
 uv run python build_nuitka.py
+
+# 运行功能与打包启动校验
+uv run python tests/verify_features.py --unit --launch-exe dist/OmniPortStudio.exe
 ```

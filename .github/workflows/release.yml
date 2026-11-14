@@ -19,6 +19,13 @@ jobs:
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Set up Flutter (3.47.9)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.9"
+          channel: "stable"
+          cache: true
+
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -31,7 +38,16 @@ jobs:
           uv python install
           uv sync --dev
 
+      - name: Build minimal Flet desktop client
+        run: |
+          uv run python scripts/build_min_flet_client.py
+
+      - name: Run unit & backend verification suite
+        run: |
+          uv run python tests/verify_features.py --unit
+
       - name: Build single-file executable with Nuitka
+        shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           if ($tag -match '^v(.+)$') {
@@ -41,7 +57,7 @@ jobs:
           }
           uv run python build_nuitka.py --output-name "$name"
 
-      - name: Verify release asset size (< 50 MB)
+      - name: Verify release asset size (< 50 MB) and startup
         shell: pwsh
         run: |
           $exe = Get-ChildItem dist/*.exe | Select-Object -First 1
@@ -51,6 +67,7 @@ jobs:
           if ($exe.Length -gt 50MB) {
             throw "Release executable exceeds 50 MB limit: $mb MB"
           }
+          uv run python tests/verify_features.py --launch-exe $exe.FullName
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -63,4 +80,4 @@ jobs:
           $mb = [math]::Round($exe.Length / 1MB, 2)
           gh release create "$tag" $exe.FullName `
             --title "OmniPort Studio $tag" `
-            --notes "Windows x64 单文件发行版（使用 Nuitka 构建，体积 ${mb} MB，已内嵌 Flet Desktop 运行时）。"
+            --notes "Windows x64 单文件发行版（Nuitka + 精简 Flet Desktop 运行时，体积 ${mb} MB，已通过自动化功能与启动校验）。"
